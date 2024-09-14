@@ -10,6 +10,10 @@ import gui_components as gui
 
 
 
+def showImg(img):
+    cv2.imshow("Img", img)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
 
 
 def showMatches(matches, of: str | MatLike, in_:MatLike):
@@ -62,7 +66,13 @@ def read(image:MatLike) -> str:
 
 
 
-def move_mouse_curve(start, end, func, duration=2, steps=100):
+def mousePos():
+    pos =pyautogui.position()
+    return pos[0], pos[1]
+
+
+    
+def move_mouse_curve(start=None, end=None, func=lambda x: x**3, duration=1, steps=10):
     """
     Moves the mouse from `start` to `end` along a curve defined by `func`.
 
@@ -75,6 +85,10 @@ def move_mouse_curve(start, end, func, duration=2, steps=100):
     - duration: float - Duration in seconds over which to complete the movement.
     - steps: int - Number of steps (points) to generate along the curve.
     """
+    
+    if start is None:
+        start = mousePos()
+        
     # Generate x values from 0 to 1
     x_values = np.linspace(0, 1, steps)
     y_values = [func(x) for x in x_values]
