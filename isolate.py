@@ -2,7 +2,7 @@ import cv2
 import pyautogui
 
 from util import *
-from gui_components import *
+from resources import ids as gui
 
 
 
@@ -43,6 +43,7 @@ unit_qty_section=(
     unit_qty_box_height)
 
 
+
 section=getSection(unit_qty_section)
 
 unit_qty_img=screenshot(section=section,gray=True)
@@ -56,9 +57,24 @@ except ValueError:
     print("Unit qty is not a number")
 
 
-from gui_comps.units import units
-print(units.death_unit)
+
+import resources.ids as gui
+
+
 exit()
+section=getSection((940,438,195,40)) #first
+section=getSection((1080,438,180,40)) #second
+screen=screenshot(section,gray=True)
+text=read(screen,text=True)
+print(text)
+
+showImg(screen)
+exit()
+# unit=load(ui.fortress)
+# unit=absLoad(gui.veteran_demon_horror_unit)
+# matches=find(unit,screen)
+# print(len(matches))
+# showMatches(matches,unit,screen)
 
 
 

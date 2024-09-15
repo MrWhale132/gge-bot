@@ -1,4 +1,4 @@
-import gui_components as gui
+import resources.ids as gui
 from config import Config
 
 import cv2
@@ -7,7 +7,6 @@ import mss
 import numpy as np
 
 from util import *
-
 
 
 

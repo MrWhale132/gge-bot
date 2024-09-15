@@ -1,7 +1,0 @@
-fortress="fortress.png"
-attack_option_button="attack_option_button.png"
-confirm_button="confirm_button.png"
-unit_slot="unit_slot.png"
-enter_castle_button="enter_castle_button.png"
-barrack_menu_button="barrack_menu_button.png"
-unit_overview_button="unit_overview_button.png"

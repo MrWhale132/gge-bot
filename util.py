@@ -3,22 +3,22 @@ import numpy as np
 from cv2.typing import MatLike
 
 from config import Config
-import gui_components as gui
 
+from resources.ids import resource
 
 
 
 
 
 def showImg(img):
-    cv2.imshow("Img", img)
+    cv2.imshow("Img", loadIfResource(img))
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
 
-def showMatches(matches, of: str | MatLike, in_:MatLike):
+def showMatches(matches, of: resource | MatLike, in_:MatLike):
     
-    of=loadIfString(of)
+    of=loadIfResource(of)
     
     # Draw rectangles around the matches
     for loc in matches:
@@ -36,16 +36,18 @@ def showMatches(matches, of: str | MatLike, in_:MatLike):
 
 
 
-def loadIfString(img):
-    if type(img) is str: return load(img)
-    return img
+import root
 
-def load(img:str):
-    return cv2.imread(getimg(img), cv2.IMREAD_COLOR)
+def loadIfResource(resource_:resource):
+    if isinstance(resource_,resource): return absLoad(resource_)
+    return resource_
 
-def getimg(filename:str):
-    return Config.gui_comps_path+"/" + filename 
-# Take a screenshot and convert it to a format OpenCV can work with
+
+def absLoad(resource_: resource):
+    absPath=f"{root.project_path}/{Config.resources_rel_path}/{resource_.path}/{resource_._name}"
+    return cv2.imread(absPath, cv2.IMREAD_COLOR)
+
+
 
 
 def screenshot(section = None, to_cv2=True, gray=False):
@@ -61,8 +63,9 @@ def screenshot(section = None, to_cv2=True, gray=False):
         
         
         
-def read(image:MatLike) -> str:
-    return pytesseract.image_to_string(image, lang="hun",config=Config.tesseract_config).strip()
+def read(image:MatLike, text=False) -> str:
+    config = None if text else Config.tesseract_config
+    return pytesseract.image_to_string(image, lang="hun",config=config).strip()
 
 
 
@@ -129,18 +132,18 @@ def getSection(section):
 
 
 
-def find(image: str|MatLike, in_: list|MatLike =None, transpose_=True, threshold=0.8):
+def find(image: resource|MatLike, in_: list|MatLike =None, transpose_=True, threshold=0.8):
     
     if in_ is None or type(in_) is list:
-        screen_rgb =screenshot(section=in_)
+        in_ =screenshot(section=in_)
 
-    image=loadIfString(image)
+    image=loadIfResource(image)
 
     # Convert the template image to RGB
     template_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
     # Use template matching to find the template in the screenshot
-    result = cv2.matchTemplate(screen_rgb, template_rgb, cv2.TM_CCOEFF_NORMED)
+    result = cv2.matchTemplate(in_, template_rgb, cv2.TM_CCOEFF_NORMED)
 
     # Find where the matches occur
     locations = np.where(result >= threshold)

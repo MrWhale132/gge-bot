@@ -1,3 +1,4 @@
 class Config:
-    gui_comps_path="./gui_comps"
+    resources_rel_path="resources"
+    #number specific
     tesseract_config = r'--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789'
