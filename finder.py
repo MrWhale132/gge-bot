@@ -26,7 +26,7 @@ print(len(matches))
 print(len(filtered))
 
 if len(filtered) == 0:
-    print("No fotress found")
+    print("No fortress found")
     exit()
 
 

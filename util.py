@@ -1,11 +1,11 @@
+from posixpath import abspath
 import pytesseract, cv2, mss, pyautogui
 import numpy as np
 from cv2.typing import MatLike
 
 from config import Config
 
-from resources.ids import resource
-
+from resources.ids import String_rs, image_rs, resource
 
 
 
@@ -42,6 +42,29 @@ def loadIfResource(resource_:resource):
     if isinstance(resource_,resource): return absLoad(resource_)
     return resource_
 
+
+
+
+from plum import dispatch
+
+
+@dispatch
+def load(rs: resource):
+    raise NotImplementedError(f"unknown resource type: {type(rs).__name__} ")
+ 
+@dispatch
+def load(text:String_rs) -> str:
+    return open(absPath(text),mode="r",encoding="utf-8").read()
+    
+
+@dispatch
+def load(image:image_rs) -> MatLike:
+    return cv2.imread(absPath(image), cv2.IMREAD_COLOR)
+
+
+
+def absPath(resource_: resource):
+    return ( f"{root.project_path}/{Config.resources_rel_path}/{resource_.path}/{resource_._name}")
 
 def absLoad(resource_: resource):
     absPath=f"{root.project_path}/{Config.resources_rel_path}/{resource_.path}/{resource_._name}"
