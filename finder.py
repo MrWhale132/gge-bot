@@ -1,4 +1,6 @@
 import resources.ids as gui
+import util
+from util import CoordPairList
 from config import Config
 
 import cv2
@@ -10,24 +12,7 @@ from util import *
 
 
 
-matches=find(gui.fortress)
-
-filtered=[]
-# filter out duplicates
-# i will be -1 first but its okay
-for i in range(0, len(matches)):
-    distance= (matches[i][0] - matches[i-1][0])**2 + (matches[i][1] - matches[i-1][1])**2
-    # print(distance)
-    if distance > 1000:
-        filtered.append(matches[i])
-
-
-print(len(matches))
-print(len(filtered))
-
-if len(filtered) == 0:
-    print("No fortress found")
-    exit()
+filtered:CoordPairList=find(gui.fortress)
 
 
 pos=pyautogui.position()

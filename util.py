@@ -1,13 +1,104 @@
-from posixpath import abspath
+import typing
+from typing import List, Any
+
+from typing import reveal_type
+from nptyping import NDArray, Shape, Int32
+
 import pytesseract, cv2, mss, pyautogui
 import numpy as np
+from plum import dispatch
 from cv2.typing import MatLike
 
 from config import Config
 
 from resources.ids import String_rs, image_rs, resource
 
+import numpy.typing as npt
+from typing import Annotated
 
+CoordPairList = list[tuple[int, int]]
+CoordLists = tuple[list[int], list[int]]
+
+from typing import TypeGuard
+
+
+def isCoordPairList(obj: Any) -> TypeGuard[CoordPairList]:
+    # TODO type check of each element
+    return (
+            hasattr(obj, "__len__") and
+            all(hasattr(x, "__len__") and len(x) == 2 for x in obj)
+    )
+
+
+def isCoordLists(obj: Any) -> TypeGuard[CoordLists]:
+    return (
+            hasattr(obj, "__len__") and
+            len(obj) == 2 and
+            hasattr(obj[0], "__len__") and
+            hasattr(obj[1], "__len__") and
+            len(obj[0]) == len(obj[1])
+    )
+
+
+def _uniqueCoordLists(locations: CoordLists) -> CoordLists:
+    filtered: CoordLists = ([], [])
+    indices = list[int]()
+
+    for i in range(0, len(locations[0])):
+        y = locations[0][i]
+        x = locations[1][i]
+        prevY = locations[0][i - 1]
+        prevX = locations[1][i - 1]
+
+        distance = (x - prevX) ** 2 + (y - prevY) ** 2
+        # print(distance)
+        if distance > 1000:
+            filtered[0].append(y)
+            filtered[1].append(x)
+
+    # if there was only one match than all of the locations will be close to each other
+    if len(locations) > 0 and len(filtered[0]) == 0:
+        filtered[0].append(locations[0][0])
+        filtered[1].append(locations[1][0])
+
+    return filtered
+
+
+def _uniqueCoordPairList(matches: CoordPairList) -> CoordPairList:
+    return [(0, 1)]
+    assert len(matches) > 0, "the nothing can't be made unique"
+
+    filtered: CoordPairList = []
+
+    if transposed:
+        # list[(x,y)]
+        length = len(matches)
+        getDistance = lambda i: (matches[i][0] - matches[i - 1][0]) ** 2 + (matches[i][1] - matches[i - 1][1]) ** 2
+    else:
+        # list[list[y], list[x]]
+        length = len(matches[0])
+        getDistance = lambda i: (matches[0][i] - matches[0][i - 1]) ** 2 + (matches[1][i] - matches[1][i - 1]) ** 2
+
+    for i in range(0, length):
+        distance = getDistance(i)
+        print(distance)
+        if distance > 1000:
+            filtered.append(matches[i])
+
+    if len(filtered) == 0:
+        filtered.append(matches[0])  # 0 length means there was only one match
+
+    return filtered
+
+
+def unique(locations: CoordPairList | CoordLists) -> CoordPairList | CoordLists:
+    if isCoordPairList(locations):
+        return _uniqueCoordPairList(locations)
+    if isCoordLists(locations):
+        # locations = typing.cast(CoordLists,locations)
+        return _uniqueCoordLists(locations)
+
+    raise ValueError(f"Invalid argument passed to unique: {locations}")
 
 
 def showImg(img):
@@ -16,10 +107,9 @@ def showImg(img):
     cv2.destroyAllWindows()
 
 
-def showMatches(matches, of: resource | MatLike, in_:MatLike):
-    
-    of=loadIfResource(of)
-    
+def showMatches(matches, of: resource | MatLike, in_: MatLike):
+    of = loadIfResource(of)
+
     # Draw rectangles around the matches
     for loc in matches:
         cv2.rectangle(in_, loc, (loc[0] + of.shape[1], loc[1] + of.shape[0]), (0, 255, 0), 2)
@@ -35,14 +125,12 @@ def showMatches(matches, of: resource | MatLike, in_:MatLike):
     cv2.destroyAllWindows()
 
 
-
 import root
 
-def loadIfResource(resource_:resource):
-    if isinstance(resource_,resource): return absLoad(resource_)
+
+def loadIfResource(resource_: resource):
+    if isinstance(resource_, resource): return absLoad(resource_)
     return resource_
-
-
 
 
 from plum import dispatch
@@ -51,54 +139,50 @@ from plum import dispatch
 @dispatch
 def load(rs: resource):
     raise NotImplementedError(f"unknown resource type: {type(rs).__name__} ")
- 
-@dispatch
-def load(text:String_rs) -> str:
-    return open(absPath(text),mode="r",encoding="utf-8").read()
-    
+
 
 @dispatch
-def load(image:image_rs) -> MatLike:
+def load(text: String_rs) -> str:
+    return open(absPath(text), mode="r", encoding="utf-8").read()
+
+
+@dispatch
+def load(image: image_rs) -> MatLike:
     return cv2.imread(absPath(image), cv2.IMREAD_COLOR)
 
 
-
 def absPath(resource_: resource):
-    return ( f"{root.project_path}/{Config.resources_rel_path}/{resource_.path}/{resource_._name}")
+    return (f"{root.project_path}/{Config.resources_rel_path}/{resource_.path}/{resource_._name}")
+
 
 def absLoad(resource_: resource):
-    absPath=f"{root.project_path}/{Config.resources_rel_path}/{resource_.path}/{resource_._name}"
+    absPath = f"{root.project_path}/{Config.resources_rel_path}/{resource_.path}/{resource_._name}"
     return cv2.imread(absPath, cv2.IMREAD_COLOR)
 
 
-
-
-def screenshot(section = None, to_cv2=True, gray=False):
+def screenshot(section=None, to_cv2=True, gray=False):
     with mss.mss() as sct:
-        if section is None: section =sct.monitors[1]
-        screenshot= sct.grab(section)
+        if section is None: section = sct.monitors[1]
+        screenshot = sct.grab(section)
     if to_cv2:
         return cv2.cvtColor(
             np.array(screenshot),
             cv2.COLOR_BGRA2GRAY if gray else cv2.COLOR_BGRA2RGB)
     else:
         return screenshot
-        
-        
-        
-def read(image:MatLike, text=False) -> str:
-    config = None if text else Config.tesseract_config
-    return pytesseract.image_to_string(image, lang="hun",config=config).strip()
 
+
+def read(image: MatLike, text=False) -> str:
+    config = None if text else Config.tesseract_config
+    return pytesseract.image_to_string(image, lang="hun", config=config).strip()
 
 
 def mousePos():
-    pos =pyautogui.position()
+    pos = pyautogui.position()
     return pos[0], pos[1]
 
 
-    
-def move_mouse_curve(start=None, end=None, func=lambda x: x**3, duration=1, steps=10):
+def move_mouse_curve(start=None, end=None, func=lambda x: x ** 3, duration=1, steps=10):
     """
     Moves the mouse from `start` to `end` along a curve defined by `func`.
 
@@ -111,10 +195,10 @@ def move_mouse_curve(start=None, end=None, func=lambda x: x**3, duration=1, step
     - duration: float - Duration in seconds over which to complete the movement.
     - steps: int - Number of steps (points) to generate along the curve.
     """
-    
+
     if start is None:
         start = mousePos()
-        
+
     # Generate x values from 0 to 1
     x_values = np.linspace(0, 1, steps)
     y_values = [func(x) for x in x_values]
@@ -133,7 +217,23 @@ def move_mouse_curve(start=None, end=None, func=lambda x: x**3, duration=1, step
     for point in points:
         pyautogui.moveTo(point[0], point[1], duration=sleep_time, tween=pyautogui.easeInOutQuad)
         # time.sleep(sleep_time)
-        
+
+
+PointLike = typing.Union[
+    tuple[int, int],
+    list[int, int]
+]
+
+
+def move_mouse_to(point: PointLike):
+    move_mouse_curve(
+        start=mousePos(),
+        end=point,
+        func=lambda x: x ** 3,
+        duration=1,
+        steps=10
+    )
+
 
 
 
@@ -145,6 +245,7 @@ def getSection(top, left, width, height):
         "height": height
     }
 
+
 def getSection(section):
     return {
         "top": section[1],
@@ -154,13 +255,20 @@ def getSection(section):
     }
 
 
+def find(image: resource | MatLike,
+         in_: list | MatLike = None,
+         transpose_=True,
+         threshold=0.8,
+         unique_=True,
+         returnScreenshot=False
+         ):
+    if in_ is not None and returnScreenshot:
+        raise ValueError("Currently there is no such situation where the user provided screenshot needs to be returned")
 
-def find(image: resource|MatLike, in_: list|MatLike =None, transpose_=True, threshold=0.8):
-    
     if in_ is None or type(in_) is list:
-        in_ =screenshot(section=in_)
+        in_ = screenshot(section=in_)
 
-    image=loadIfResource(image)
+    image = loadIfResource(image)
 
     # Convert the template image to RGB
     template_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -169,11 +277,17 @@ def find(image: resource|MatLike, in_: list|MatLike =None, transpose_=True, thre
     result = cv2.matchTemplate(in_, template_rgb, cv2.TM_CCOEFF_NORMED)
 
     # Find where the matches occur
-    locations = np.where(result >= threshold)
-    
+    locations: CoordLists = np.where(result >= threshold)
+    # print(locations)
+    if unique_:
+        locations = _uniqueCoordLists(locations)
+
     if transpose_:
-        locations = transpose(locations)
-    
+        locations: CoordPairList = transpose(locations)
+
+    if returnScreenshot:
+        return locations, in_
+
     return locations
 
 
