@@ -1,20 +1,13 @@
 import typing
-from typing import List, Any
-
-from typing import reveal_type
-from nptyping import NDArray, Shape, Int32
+from typing import Any, overload
 
 import pytesseract, cv2, mss, pyautogui
 import numpy as np
-from plum import dispatch
 from cv2.typing import MatLike
 
 from config import Config
 
 from resources.ids import String_rs, image_rs, resource
-
-import numpy.typing as npt
-from typing import Annotated
 
 CoordPairList = list[tuple[int, int]]
 CoordLists = tuple[list[int], list[int]]
@@ -40,9 +33,22 @@ def isCoordLists(obj: Any) -> TypeGuard[CoordLists]:
     )
 
 
+
+
+
 def _uniqueCoordLists(locations: CoordLists) -> CoordLists:
     filtered: CoordLists = ([], [])
+    if len(locations[0]) == 0: return filtered
+
     indices = list[int]()
+
+    # xSorted=sorted(transpose(locations), key=lambda x: x[0])
+    # print([coord[0] for coord in xSorted])
+    # trans = transpose(xSorted)
+    # print(trans[0])
+    # exit()
+    #an other array should be used
+    locations =transpose( sorted(transpose(locations), key=lambda x: x[0]))[::-1]
 
     for i in range(0, len(locations[0])):
         y = locations[0][i]
@@ -56,7 +62,7 @@ def _uniqueCoordLists(locations: CoordLists) -> CoordLists:
             filtered[0].append(y)
             filtered[1].append(x)
 
-    # if there was only one match than all of the locations will be close to each other
+    # if there was only one match than all the locations will be close to each other
     if len(locations) > 0 and len(filtered[0]) == 0:
         filtered[0].append(locations[0][0])
         filtered[1].append(locations[1][0])
@@ -107,12 +113,20 @@ def showImg(img):
     cv2.destroyAllWindows()
 
 
-def showMatches(matches, of: resource | MatLike, in_: MatLike):
+
+
+from models.objects.Point import Point
+
+
+def showMatches(matches:list[Point], of: resource | MatLike, in_: MatLike = None):
+    if in_ is None:
+        in_ = screenshot()
+
     of = loadIfResource(of)
 
     # Draw rectangles around the matches
     for loc in matches:
-        cv2.rectangle(in_, loc, (loc[0] + of.shape[1], loc[1] + of.shape[0]), (0, 255, 0), 2)
+        cv2.rectangle(in_, loc.coordinates, (loc[0] + of.shape[1], loc[1] + of.shape[0]), (0, 255, 0), 2)
 
     # Create a named window and specify the window size
     window_name = 'Image Display'
@@ -172,14 +186,27 @@ def screenshot(section=None, to_cv2=True, gray=False):
         return screenshot
 
 
-def read(image: MatLike, text=False) -> str:
-    config = None if text else Config.tesseract_config
-    return pytesseract.image_to_string(image, lang="hun", config=config).strip()
+
+#TODO move it to top
+from config import TesseractConfig
 
 
-def mousePos():
+def read(image: MatLike, numbers=False, config:TesseractConfig = TesseractConfig.default()) -> str:
+    #TODO assert use numbers or config, but not both
+    if numbers:
+        _config:str = TesseractConfig.number_optimized().build()
+    else:
+        _config = config.build()
+
+    return pytesseract.image_to_string(image, lang="hun", config=_config).strip()
+
+
+
+from models.objects.Point import Point
+
+def mousePos()->Point:
     pos = pyautogui.position()
-    return pos[0], pos[1]
+    return Point(pos.x, pos.y)
 
 
 def move_mouse_curve(start=None, end=None, func=lambda x: x ** 3, duration=1, steps=10):
@@ -218,21 +245,41 @@ def move_mouse_curve(start=None, end=None, func=lambda x: x ** 3, duration=1, st
         pyautogui.moveTo(point[0], point[1], duration=sleep_time, tween=pyautogui.easeInOutQuad)
         # time.sleep(sleep_time)
 
+from models.objects.Point import Point
 
 PointLike = typing.Union[
     tuple[int, int],
-    list[int, int]
+    list[int, int],
+    Point
 ]
 
 
 def move_mouse_to(point: PointLike):
+    start = mousePos()
+
+    if isinstance(point,Point) and point.relative:
+        point = start + point
+
     move_mouse_curve(
-        start=mousePos(),
+        start=start,
         end=point,
         func=lambda x: x ** 3,
         duration=1,
         steps=10
     )
+
+
+
+def move_mouse_rel(point: PointLike):
+    pos = mousePos()
+    move_mouse_curve(
+        start=pos,
+        end=pos+point,
+        func=lambda x: x ** 3,
+        duration=1,
+        steps=10
+    )
+
 
 
 
@@ -246,7 +293,7 @@ def getSection(top, left, width, height):
     }
 
 
-def getSection(section):
+def getSection(section)->dict:
     return {
         "top": section[1],
         "left": section[0],
@@ -255,13 +302,19 @@ def getSection(section):
     }
 
 
+
+
 def find(image: resource | MatLike,
          in_: list | MatLike = None,
-         transpose_=True,
+         transpose_=False,
          threshold=0.8,
          unique_=True,
-         returnScreenshot=False
-         ):
+         returnScreenshot=False,
+         asPoints=True
+         ) -> CoordLists | CoordPairList | list[Point]:
+
+    assert transpose_ != asPoints
+
     if in_ is not None and returnScreenshot:
         raise ValueError("Currently there is no such situation where the user provided screenshot needs to be returned")
 
@@ -285,11 +338,63 @@ def find(image: resource | MatLike,
     if transpose_:
         locations: CoordPairList = transpose(locations)
 
+    elif asPoints:
+        locations:list[Point] = [Point(x,y) for x, y in zip(*locations[::-1])]
+
     if returnScreenshot:
         return locations, in_
 
     return locations
 
 
+
 def transpose(locations):
     return list(zip(*locations[::-1]))
+
+
+@overload
+def click(waiteBeforeClick:float =0.1, waitAfterClick:float = 0.1)->None:...
+
+@overload
+def click(point:Point,waiteBeforeClick:float =0.1, waitAfterClick:float = 0.1)->None:...
+
+
+from typing import Optional
+
+def click(
+        point:Optional[Point | tuple[int,int] | list[int, int]] = None,
+        waiteBeforeClick:float =0.2,
+        waitAfterClick:float = 0.1)\
+        ->None:
+
+    if point is not None:
+        if not isinstance(point, Point):
+            if isinstance(point,list | tuple):
+                _point = Point(*point)
+            else:
+                raise TypeError("point must be Point or tuple/list of int")
+        else:
+            _point = point
+        _move_to_than_click(_point, waiteBeforeClick, waitAfterClick)
+    else:
+        _just_click(waiteBeforeClick, waitAfterClick)
+
+
+def _just_click(waiteBeforeClick:float =0.1, waitAfterClick:float = 0.1)->None:
+    if waiteBeforeClick > 0:
+        pyautogui.sleep(waiteBeforeClick)
+
+    pyautogui.click()
+
+    if waitAfterClick > 0:
+        pyautogui.sleep(waitAfterClick)
+
+
+def _move_to_than_click(point: Point, waiteBeforeClick:float =0.1, waitAfterClick:float = 0.1)->None:
+    move_mouse_to(point)
+    _just_click(waiteBeforeClick, waitAfterClick)
+
+
+
+
+

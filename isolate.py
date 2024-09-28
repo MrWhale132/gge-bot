@@ -48,7 +48,7 @@ section=getSection(unit_qty_section)
 
 unit_qty_img=screenshot(section=section,gray=True)
 
-unit_qty_text=read(unit_qty_img)
+unit_qty_text=read(unit_qty_img,numbers=True)
 
 try:
     unitQty=int(unit_qty_text)

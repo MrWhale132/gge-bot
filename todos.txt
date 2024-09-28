@@ -1,0 +1,1 @@
+make ui operations async, switch thread.sleeps to asyncio.sleep
