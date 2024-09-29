@@ -15,6 +15,26 @@ CoordLists = tuple[list[int], list[int]]
 from typing import TypeGuard
 
 
+
+
+
+
+
+
+
+def scroll(tick:int) -> None:
+    print(f"scrolling: {tick}")
+    if tick == 0: return
+
+    direction = 1 if tick > 0 else -1
+    for i in range(tick * direction): # dir * amount = always positive
+        pyautogui.scroll(direction * 10)
+        pyautogui.sleep(0.01)
+
+
+
+
+
 def isCoordPairList(obj: Any) -> TypeGuard[CoordPairList]:
     # TODO type check of each element
     return (
@@ -209,7 +229,7 @@ def mousePos()->Point:
     return Point(pos.x, pos.y)
 
 
-def move_mouse_curve(start=None, end=None, func=lambda x: x ** 3, duration=1, steps=10):
+def move_mouse_curve(start=None, end=None, func=lambda x: x ** 3, duration:float=1, steps=10):
     """
     Moves the mouse from `start` to `end` along a curve defined by `func`.
 
@@ -254,7 +274,7 @@ PointLike = typing.Union[
 ]
 
 
-def move_mouse_to(point: PointLike):
+def move_mouse_to(point: PointLike,duration:float=0.5):
     start = mousePos()
 
     if isinstance(point,Point) and point.relative:
@@ -264,7 +284,7 @@ def move_mouse_to(point: PointLike):
         start=start,
         end=point,
         func=lambda x: x ** 3,
-        duration=1,
+        duration=duration,
         steps=10
     )
 

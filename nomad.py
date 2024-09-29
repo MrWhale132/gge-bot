@@ -12,7 +12,7 @@ from resources.ids import resource
 
 def findCamps(campType: resource):
     global camps
-    camps = util.find(campType,threshold=0.82)
+    camps = util.find(campType,threshold=0.80)
 
 
 def readTimeBeforeSkip():
@@ -47,7 +47,7 @@ def readTimeOnSkip():
     # util.showImg(remaining_time_img)
     # exit()
 
-    config = TesseractConfig.number_optimized().With(time_comp_seperator)
+    config = TesseractConfig.nomad_cd()
 
     global remaining_time_text
 
@@ -210,7 +210,7 @@ def skip_cooldown():
 
 
 from util import Point
-from common import ActionPalette, AtackConfirmationPanel
+from common import ActionPalette, AttackConfirmationPanel
 
 
 def start_attack(camp:Point):
@@ -222,7 +222,7 @@ def start_attack(camp:Point):
 
 
 
-from common import OnCooldownPanel, AtackConfirmationPanel,Presets
+from common import OnCooldownPanel, AttackConfirmationPanel,Presets
 from actions import attack_with_preset
 
 
@@ -263,10 +263,11 @@ def main():
         start_attack(camp.location)
         if not camp.isFree:
             skip_cooldown()
-        util.click(AtackConfirmationPanel.confirm_button_point)
-        time.sleep(2)
-        attack_with_preset(preset)
-    
+        util.click(AttackConfirmationPanel.confirm_button_point)
+        time.sleep(1)
+
+        attack_with_preset(preset,fill_in_waves=True)
+
 
     run_flow(allCamp[0],Presets.nomad)
 
