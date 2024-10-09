@@ -1,4 +1,4 @@
-class resource:
+class Resource:
     path: str
 
     def __init__(self, name):
@@ -6,13 +6,13 @@ class resource:
         # print(name)
 
 
-class button_rs(resource): pass
 
 
-class image_rs(resource): pass
+class image_rs(Resource): pass
+class button_rs(image_rs): pass
 
 
-class realm_rs(resource): pass
+class realm_rs(Resource): pass
 
 
 class strom_rs(realm_rs): pass
@@ -27,7 +27,7 @@ class Nomad_rs(GreatEmpire_rs): pass
 class FirePeak_rs(realm_rs): pass
 
 
-class String_rs(resource): pass
+class String_rs(Resource): pass
 
 
 class DisplayName_rs(String_rs): pass
@@ -47,6 +47,8 @@ veteran_demon_horror_unit__display_name = DisplayName_rs("veteran_demon_horror_u
 
 free_nomad_camp = Nomad_rs("free_nomad_camp.png")
 occupied_nomad_camp = Nomad_rs("occupied_nomad_camp.png")
+#todo this whole resource inheritance must be rethinked and reworked
+open_timeskips_menu_buttons = Nomad_rs("open_timeskips_menu_buttons.png")
 
 dragon_cultist_free_npc_tower_level_3 = FirePeak_rs("dragon_cultist_free_npc_tower_level_3.png")
 

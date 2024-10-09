@@ -1,3 +1,14 @@
+from __future__ import annotations
+from typing import Sequence
+
+from typing import TYPE_CHECKING
+
+
+if TYPE_CHECKING:
+    from justtyping.justtypes import PointLike
+
+
+
 class Point:
 
     def __init__(self, x=0, y=0, relative=False):
@@ -5,6 +16,34 @@ class Point:
         self.y = y
         self.relative = relative
         self.coordinates = [x, y]
+
+
+    @staticmethod
+    def From(
+            x:int | PointLike | Sequence[PointLike],
+            y:int=None)\
+            ->Point | Sequence[Point]:
+
+        if isinstance(x,int):
+            assert y is not None,"can not use x without y"
+            assert isinstance(y,int),"y must be an integer"
+
+            return Point(x, y)
+
+        assert y is None,"y can only be used if x is also a coordinate"
+
+        if jtg.isPointLike(x):
+            return Point(*x)
+
+        if isinstance(x, Sequence):
+            if len(x) == 0:
+                return []
+
+            if jtg.isPointLike(x[0]):
+                return [Point(*i) for i in x]
+
+        raise TypeError("Unsupported operand type(s) for Point.From: '{}'".format(type(x)))
+
 
 
     def __add__(self, other):
@@ -25,6 +64,10 @@ class Point:
 
         return Point(self.x + x, self.y + y)
 
+
+    def asCoordinates(self)->str:
+        return f"({self.x}, {self.y})"
+
     def __getitem__(self, key):
         return self.coordinates[key]
 
@@ -33,3 +76,6 @@ class Point:
 
     def __repr__(self):
         return self.__str__()
+
+
+import justtyping.justtypeguards as jtg

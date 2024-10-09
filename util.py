@@ -1,5 +1,6 @@
+import builtins
 import typing
-from typing import Any, overload
+from typing import Any, overload, Sequence
 
 import pytesseract, cv2, mss, pyautogui
 import numpy as np
@@ -7,17 +8,86 @@ from cv2.typing import MatLike
 
 from config import Config
 
-from resources.ids import String_rs, image_rs, resource
+from resources.ids import String_rs, image_rs, Resource
 
 CoordPairList = list[tuple[int, int]]
 CoordLists = tuple[list[int], list[int]]
 
 from typing import TypeGuard
+from typing import Union
+
+from justtyping.justtypes import PointLike
 
 
 
 
+#IMPORTANT
+#todo we use a 0.95 threshold to account for flux's blue light filtering
+def similar(imageA:np.array, imageB:Resource, similarity_threshold:float = 0.95, returnSimilarity:bool = False) ->float | tuple[bool,float]:
+    imageB=loadImg(imageB)
+    assert imageA.shape == imageB.shape, "the shape of the images must match"
 
+    result = cv2.matchTemplate(imageA, imageB, cv2.TM_CCOEFF_NORMED)
+    # print(result)
+    assert len(result) == 1, "for the image with the same shape there should be only one match result"
+
+    similarity =typing.cast(float,result[0,0])
+    _similar = similarity >= similarity_threshold
+
+    if returnSimilarity:
+        return _similar, similarity
+
+    return _similar
+
+
+    # unfortunately this does not work as I imagined.
+    # imageB=loadImg(imageB)
+    # assert imageA.shape == imageB.shape, "the shape of the images must match"
+    #
+    # max_diff=255**2
+    # for dim in imageA.shape:
+    #     max_diff*=dim
+    #
+    # diff=np.sum((imageA-imageB)**2)
+    # print("diff",diff, max_diff, diff/max_diff)
+    # similarity= 1-diff/max_diff
+    #
+    # return similarity>=similarity_threshold, similarity
+
+
+
+def thres(image:np.array, against:Union[list[int,int,int], np.array], similarity:float)->np.array:
+    thresed=image.copy()
+
+    max_distance=sum(np.array([255,255,255])**2)
+
+    font_color = against
+    if not isinstance(against, np.ndarray):
+        font_color = np.array(against)
+
+    for y in range(image.shape[0]):
+        for x in range(image.shape[1]):
+            pixel = image[y, x]
+            squared_distance = sum((pixel-font_color)**2)
+            _similarity = 1-squared_distance/max_distance
+
+            if _similarity >= similarity:
+                thresed[y, x] = [255, 255, 255]
+            else:
+                thresed[y, x] = [0, 0, 0]
+
+    return thresed
+
+
+
+def typeIn(keys: str | list, interval: float = 0.1):
+    _keys = keys
+    if isinstance(keys, str):
+        _keys=list(keys)
+    pyautogui.press(list(_keys),interval=interval)
+
+
+from models.objects.Point import Point
 
 
 
@@ -53,6 +123,120 @@ def isCoordLists(obj: Any) -> TypeGuard[CoordLists]:
     )
 
 
+from typing import Callable
+from justtyping.justtypes import Coordinate2D
+from justtyping.justtypeguards import isCoordinate2D
+
+
+class Group():
+    def __init__(self):
+        self.elements: list[Coordinate2D] = []
+
+
+    def add(self, element: Coordinate2D):
+        self.elements.append(element)
+
+    def isOccupied(self):
+        return True
+
+
+from typing import override
+
+
+
+class ElementField(Group):
+    def __init__(self, dimension:tuple[int,int]):
+        width = dimension[0]
+        height = dimension[1]
+        self.width = width
+        self.height = height
+
+        self.fieldDimension = dimension
+        self.field:list[list[Group]] =[[self]*width for _ in range(height)]
+
+        self.groups:list[Group]=[]
+
+        self.group_occupation_area_half_side_length = 15
+
+
+    def group(self, elements:list[Coordinate2D]):
+        for element in elements:
+            self.addElement(element)
+
+    def keys(self)->list[Coordinate2D]:
+        return [group.elements[0] for group in self.groups]
+
+
+    def addElement(self, element: Coordinate2D):
+        self._get(element).add(element)
+
+
+    @override
+    def add(self, element: Coordinate2D):
+        newGroup = Group()
+        newGroup.add(element)
+
+        group_occupation_area_half_side_length =15
+
+        #square
+        #upper left corner
+        xStart = element[0] - self.group_occupation_area_half_side_length
+        yStart = element[1] - self.group_occupation_area_half_side_length
+
+        #lower right corner
+        xEnd = element[0] + self.group_occupation_area_half_side_length + 1
+        yEnd= element[1] + self.group_occupation_area_half_side_length + 1
+
+        #todo optimize, instead of accessing one row multiple times, get the row once
+        for y in range(yStart,yEnd):
+            for x in range(xStart,xEnd):
+                if 0 <= y < self.height and 0 <= x < self.width:
+                    pos =(x,y)
+                    if not self._get(pos).isOccupied():
+                        self._set(pos, newGroup)
+
+        self.groups.append(newGroup)
+
+
+    @override
+    def isOccupied(self):
+        return False
+
+
+    def _set(self, at:Coordinate2D, group:Group):
+        self.field[at[1]][at[0]]=group
+
+
+    def _get(self, at:Coordinate2D):
+        return self.field[at[1]][at[0]]
+
+
+    #debug
+    def printField(self):
+        for y in range(0, self.height):
+            for x in range(0, self.width):
+                if self._get((x,y)).isOccupied():
+                    print("X", end="")
+                else:
+                    print(".", end="")
+            print()
+
+
+
+from justtyping.justtypes import PointLike
+
+
+def _unique(locations:list[PointLike])-> list[PointLike]:
+    if len(locations) ==0:
+        return []
+
+    height = max([loc[1] for loc in locations])+1
+    width = max([loc[0] for loc in locations])+1
+
+    field = ElementField((width, height))
+    field.group(locations)
+
+    return field.keys()
 
 
 
@@ -60,14 +244,19 @@ def _uniqueCoordLists(locations: CoordLists) -> CoordLists:
     filtered: CoordLists = ([], [])
     if len(locations[0]) == 0: return filtered
 
-    indices = list[int]()
+    height = max(locations[1])
+    width = max(locations[0])
 
-    # xSorted=sorted(transpose(locations), key=lambda x: x[0])
-    # print([coord[0] for coord in xSorted])
-    # trans = transpose(xSorted)
-    # print(trans[0])
+    field = ElementField((width,height))
+    coordinates = np.transpose(locations[::-1])
+    field.group(coordinates)
+
+    return field.keys()
+
+    # #an other array should be used
+    # print(locations)
+    # print(np.transpose(locations[::-1]))
     # exit()
-    #an other array should be used
     locations =transpose( sorted(transpose(locations), key=lambda x: x[0]))[::-1]
 
     for i in range(0, len(locations[0])):
@@ -91,6 +280,7 @@ def _uniqueCoordLists(locations: CoordLists) -> CoordLists:
 
 
 def _uniqueCoordPairList(matches: CoordPairList) -> CoordPairList:
+    raise NotImplementedError("out of service")
     return [(0, 1)]
     assert len(matches) > 0, "the nothing can't be made unique"
 
@@ -118,6 +308,7 @@ def _uniqueCoordPairList(matches: CoordPairList) -> CoordPairList:
 
 
 def unique(locations: CoordPairList | CoordLists) -> CoordPairList | CoordLists:
+    raise NotImplementedError("out of service")
     if isCoordPairList(locations):
         return _uniqueCoordPairList(locations)
     if isCoordLists(locations):
@@ -138,13 +329,12 @@ def showImg(img):
 from models.objects.Point import Point
 
 
-def showMatches(matches:list[Point], of: resource | MatLike, in_: MatLike = None):
+def showMatches(matches:list[Point], of: Resource | MatLike, in_: MatLike = None):
     if in_ is None:
         in_ = screenshot()
 
     of = loadIfResource(of)
 
-    # Draw rectangles around the matches
     for loc in matches:
         cv2.rectangle(in_, loc.coordinates, (loc[0] + of.shape[1], loc[1] + of.shape[0]), (0, 255, 0), 2)
 
@@ -162,8 +352,8 @@ def showMatches(matches:list[Point], of: resource | MatLike, in_: MatLike = None
 import root
 
 
-def loadIfResource(resource_: resource):
-    if isinstance(resource_, resource): return absLoad(resource_)
+def loadIfResource(resource_: Resource):
+    if isinstance(resource_, Resource): return absLoad(resource_)
     return resource_
 
 
@@ -171,8 +361,8 @@ from plum import dispatch
 
 
 @dispatch
-def load(rs: resource):
-    raise NotImplementedError(f"unknown resource type: {type(rs).__name__} ")
+def load(rs: Resource):
+    raise NotImplementedError(f"unknown resource type: {builtins.type(rs).__name__} ")
 
 
 @dispatch
@@ -185,25 +375,52 @@ def load(image: image_rs) -> MatLike:
     return cv2.imread(absPath(image), cv2.IMREAD_COLOR)
 
 
-def absPath(resource_: resource):
+
+from assertpy import assert_that
+
+def loadImg(image:Resource)-> np.ndarray:
+    assert_that(image._name).ends_with(".png")
+
+    absPath = f"{root.project_path}/{Config.resources_rel_path}/{image.path}/{image._name}"
+    return cv2.imread(absPath, cv2.IMREAD_COLOR)
+
+
+
+def absPath(resource_: Resource):
     return (f"{root.project_path}/{Config.resources_rel_path}/{resource_.path}/{resource_._name}")
 
 
-def absLoad(resource_: resource):
+def absLoad(resource_: Resource):
     absPath = f"{root.project_path}/{Config.resources_rel_path}/{resource_.path}/{resource_._name}"
     return cv2.imread(absPath, cv2.IMREAD_COLOR)
 
 
-def screenshot(section=None, to_cv2=True, gray=False):
+
+from mss.screenshot import ScreenShot
+
+def screenshot(section=None, to_cv2=True, gray=False)->np.ndarray | ScreenShot:
+
     with mss.mss() as sct:
         if section is None: section = sct.monitors[1]
         screenshot = sct.grab(section)
+
+    img_np = np.array(screenshot)
+
+    if gray:
+        return cv2.cvtColor(img_np, cv2.COLOR_RGBA2GRAY)
+
     if to_cv2:
-        return cv2.cvtColor(
-            np.array(screenshot),
-            cv2.COLOR_BGRA2GRAY if gray else cv2.COLOR_BGRA2RGB)
-    else:
-        return screenshot
+        return  cv2.cvtColor(img_np,cv2.COLOR_RGBA2RGB)
+
+    return screenshot
+
+
+
+import mss.tools
+#todo currently we can not say param:ImageResource
+def write_img(image:ScreenShot, into:Resource):
+    path = absPath(into)
+    mss.tools.to_png(image.rgb, image.size, output=path)
 
 
 
@@ -266,12 +483,8 @@ def move_mouse_curve(start=None, end=None, func=lambda x: x ** 3, duration:float
         # time.sleep(sleep_time)
 
 from models.objects.Point import Point
+from justtyping.justtypes import PointLike
 
-PointLike = typing.Union[
-    tuple[int, int],
-    list[int, int],
-    Point
-]
 
 
 def move_mouse_to(point: PointLike,duration:float=0.5):
@@ -323,43 +536,51 @@ def getSection(section)->dict:
 
 
 
+from justtyping.justtypes import PointLike
 
-def find(image: resource | MatLike,
+
+def find(image: Resource | MatLike,
          in_: list | MatLike = None,
-         transpose_=False,
-         threshold=0.8,
+         transpose_=True,
+         threshold=0.7, # it is that low to account for flux's blue light filtering
          unique_=True,
          returnScreenshot=False,
          asPoints=True
          ) -> CoordLists | CoordPairList | list[Point]:
 
-    assert transpose_ != asPoints
+    # assert transpose_ != asPoints
 
     if in_ is not None and returnScreenshot:
         raise ValueError("Currently there is no such situation where the user provided screenshot needs to be returned")
 
-    if in_ is None or type(in_) is list:
+    if in_ is None or builtins.type(in_) is list:
         in_ = screenshot(section=in_)
 
     image = loadIfResource(image)
 
-    # Convert the template image to RGB
-    template_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
     # Use template matching to find the template in the screenshot
-    result = cv2.matchTemplate(in_, template_rgb, cv2.TM_CCOEFF_NORMED)
+    result = cv2.matchTemplate(in_, image, cv2.TM_CCOEFF_NORMED)
 
     # Find where the matches occur
     locations: CoordLists = np.where(result >= threshold)
+    print(result[locations])
+
+    locations:list[PointLike] = np.transpose(locations[::-1]) #mypy ignore
+
+    locations= typing.cast(list[PointLike], locations)
+
     # print(locations)
     if unique_:
-        locations = _uniqueCoordLists(locations)
+        print("before ",len(locations))
+        locations = _unique(locations)
+        print("after ", len(locations))
 
-    if transpose_:
-        locations: CoordPairList = transpose(locations)
+    if not transpose_:
+        locations: CoordLists = np.transpose(locations[::-1]) #mypy ignore
 
     elif asPoints:
-        locations:list[Point] = [Point(x,y) for x, y in zip(*locations[::-1])]
+        locations:Sequence[Point] = Point.From(locations)
 
     if returnScreenshot:
         return locations, in_
@@ -378,13 +599,17 @@ def click(waiteBeforeClick:float =0.1, waitAfterClick:float = 0.1)->None:...
 @overload
 def click(point:Point,waiteBeforeClick:float =0.1, waitAfterClick:float = 0.1)->None:...
 
+@overload
+def click(point:Point,waiteBeforeClick:float =0.1, waitAfterClick:float = 0.1,moveDuration:float = 0.5)->None:...
+
 
 from typing import Optional
 
 def click(
         point:Optional[Point | tuple[int,int] | list[int, int]] = None,
         waiteBeforeClick:float =0.2,
-        waitAfterClick:float = 0.1)\
+        waitAfterClick:float = 0.1,
+        moveDuration:float = 0.5)\
         ->None:
 
     if point is not None:
@@ -395,7 +620,7 @@ def click(
                 raise TypeError("point must be Point or tuple/list of int")
         else:
             _point = point
-        _move_to_than_click(_point, waiteBeforeClick, waitAfterClick)
+        _move_to_than_click(_point, waiteBeforeClick, waitAfterClick,duration=moveDuration)
     else:
         _just_click(waiteBeforeClick, waitAfterClick)
 
@@ -410,11 +635,20 @@ def _just_click(waiteBeforeClick:float =0.1, waitAfterClick:float = 0.1)->None:
         pyautogui.sleep(waitAfterClick)
 
 
-def _move_to_than_click(point: Point, waiteBeforeClick:float =0.1, waitAfterClick:float = 0.1)->None:
-    move_mouse_to(point)
+def _move_to_than_click(point: Point, waiteBeforeClick:float =0.1, waitAfterClick:float = 0.1,duration:float = 0.5)->None:
+    move_mouse_to(point,duration=duration)
     _just_click(waiteBeforeClick, waitAfterClick)
 
 
 
+@overload
+def double_click()->None:...
 
+@overload
+def double_click(point:Point | tuple[int,int])->None:...
+
+
+def double_click(point:Point | tuple[int,int])->None:
+    click(point,waitAfterClick=0)
+    click(waiteBeforeClick=0.1,waitAfterClick=0)
 

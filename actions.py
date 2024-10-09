@@ -70,4 +70,3 @@ def read_nth_commander_number(nth: int) -> int:
     return number
 
 
-print(*range(5))

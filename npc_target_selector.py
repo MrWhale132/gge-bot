@@ -1,61 +1,27 @@
 import dragon_cultists
 import sand
+import nomad
 
-import multiprocessing as mp
-from pynput import keyboard
-import time
-import threading
+from tkinter import *
 import dearpygui.dearpygui as dpg
+import multiprocessing as mp
+#IMPORTANT
+#WARNING
+#this must be imported at the top level or eventloop wont work because
+# only the main thread can SIGNALTERM on the main module
 import thread
 
 
-
-def info():
-    t = threading.current_thread()
-    print(t.name, t.native_id)
-
-
-
-def loop():
-    while True:
-        print('Looping')
-        time.sleep(1)
-
-
-
-
-def onpress(key):
-    import threading
-    info()
-
-    if key == keyboard.Key.esc:
-        global side
-        side.kill()
-        print('terminating')
-    else:
-        print(f'Pressed: {key}')
-
-
-def listen():
-    listener = keyboard.Listener(on_press=onpress,daemon=True)
-    listener.start()
-    print('listening')
-    listener.join()
-    print("done")
-
-
-
-def gui():
-    print('GUI')
-
-
-    mapping = {
+mapping = {
         "fire inner": dragon_cultists.inner_ring,
         "fire outer": dragon_cultists.outer_ring,
-        "sand": sand.main
+        "sand": sand.main,
+        "nomad": nomad.main
     }
 
 
+
+def startgui():
     # Define the options for the dropdown
     options = ["Option 1", "Option 2", "Option 3", "Option 4"]
 
@@ -69,19 +35,10 @@ def gui():
         selected_index = options.index(selected_value)  # Get the index of the selected option
         print(f"Selected option: {selected_value} (Index: {selected_index})")
 
-        info()
-        print(__name__)
         import eventloop
-        eventloop.wrap(loop)
+        eventloop.wrap(mapping[selected_value])
+
         return
-
-        listener = keyboard.Listener(on_press=onpress)
-        listener.start()
-
-        p = mp.Process(target=eventloop.wrap,args=(loop,))
-        global side
-        side=p
-        p.start()
 
 
     # Create the DearPyGui context
@@ -114,40 +71,43 @@ def gui():
     print("destroy")
 
 
-    print('Exiting GUI')
-    return
 
 
-side:mp.Process
+def radiogroup():
+    def print_selection(sender, app_data, user_data):
+        print(f"Selected: {app_data}")
+
+        import eventloop
+        eventloop.wrap(mapping[app_data])
+
+
+
+
+    dpg.create_context()
+
+    # Create a window for the radio button group
+    with dpg.window(label="Radio Button Group Example", width=600, height=600):
+        # Create radio button group with no default selection
+        with dpg.group():
+            dpg.add_text("Choose an option:")
+            dpg.add_radio_button(list(mapping.keys()), callback=print_selection)
+
+
+    with dpg.font_registry():
+        # Load a font from your system with a larger size (adjust the path accordingly)
+        default_font = dpg.add_font("C:/Windows/Fonts/Arial.ttf", 50)  # Change to 25 to make things bigger
+
+    dpg.bind_font(default_font)  # Apply the custom font to make elements larger
+
+
+    # Show DearPyGui
+    dpg.create_viewport(title="Radio Button Example", width=600, height=600)
+    dpg.setup_dearpygui()
+    dpg.show_viewport()
+    dpg.start_dearpygui()
+    dpg.destroy_context()
+
+
 
 if __name__ == '__main__':
-    import eventloop
-    eventloop.wrap(loop)
-    print("finished")
-    exit()
-
-    info()
-    gui()
-    exit()
-    side = mp.Process(target=loop)
-
-    import thread
-    side = thread.Thread(target=loop)
-
-    listener = keyboard.Listener(on_press=onpress, daemon=True)
-    listener.start()
-
-    # listen_p = mp.Process(target=listen)
-    # listen_p.start()
-    # listen_p.join()
-    print("after")
-
-
-    side.start()
-    side.join()
-    listener.stop()
-    # listen.close()
-    print("joined")
-else:
-    print('new process')
-    info    ()
+    radiogroup()

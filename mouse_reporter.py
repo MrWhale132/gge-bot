@@ -4,27 +4,33 @@ import pyautogui
 import util
 import common
 
-
-def report_mouse_pos():
-    pos = pyautogui.position()
-    print(f"{pos[0]}, {pos[1]}")
-    
-if __name__ == '__main__':
-    while True:
-        report_mouse_pos()
-        pyautogui.sleep(1)  # wait for 1 second before reporting the new position
+# pyautogui.dragRel(0,-200,duration=1)
+# exit()
 
 
+from pynput import keyboard
+
+def asPoint(pos):
+    return f"Point({pos[0]}, {pos[1]}),"
+
+def on_press(key):
+    if key == keyboard.Key.space:
+        print(asPoint(util.mousePos()))
+    if key == keyboard.Key.esc:
+        exit()
 
 
-from pynput.mouse import Listener
-
-def on_click(x, y, button, pressed):
-    if pressed:
-        print(f"Mouse clicked at ({x}, {y}) with {button}")
-
-def detect_mouse_clicks():
+def listen():
     # Set up a listener that runs `on_click` whenever the mouse is clicked
-    with Listener(on_click=on_click) as listener:
+    with keyboard.Listener(on_press=on_press) as listener:
         listener.join()
+
+
+
+
+if __name__ == '__main__':
+    listen()
+    # while True:
+    #     report_mouse_pos()
+    #     pyautogui.sleep(1)  # wait for 1 second before reporting the new position
 

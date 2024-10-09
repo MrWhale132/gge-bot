@@ -1,18 +1,45 @@
 import time
+import typing
 
-import numpy
+import cv2
+import numpy as np
 import pyautogui
 from config import TesseractConfig
 
 import util
-from util import PointLike
+from models.objects.Point import Point
 from resources import ids as gui
-from resources.ids import resource
+from resources.ids import Resource
+#
+# #
+# camps:list[Point]
+# camps, screenshot = util.find(gui.occupied_nomad_camp,threshold=0.8,returnScreenshot=True)
+# print("#",len(camps))
+# for camp in camps:
+#     print(camp)
+# util.showMatches(camps,gui.occupied_nomad_camp,screenshot)
+# exit()
 
-
-def findCamps(campType: resource):
+def findCamps(campType: Resource = None)->None:
     global camps
-    camps = util.find(campType,threshold=0.80)
+    if campType is not None:
+        camps = util.find(campType,threshold=0.9)
+        return
+
+    free=util.find(gui.free_nomad_camp,threshold=0.9)
+    notfree=util.find(gui.occupied_nomad_camp,threshold=0.8)
+    camps = free + notfree
+
+    return
+
+
+    #todo mock, hardcoded
+    camps= [
+        Point(1148, 437),
+        Point(1226, 358),
+        Point(1222, 1124),
+        Point(1450, 1123),
+    ]
 
 
 def readTimeBeforeSkip():
@@ -36,31 +63,49 @@ def readTimeBeforeSkip():
 time_comp_seperator = ":"
 
 
-def readTimeOnSkip():
+def readCooldown():
+    # np.set_printoptions(threshold=np.inf)
+
     remaining_time_section = (
         1310, 550,
         100, 25
     )
 
     section = util.getSection(remaining_time_section)
-    remaining_time_img = util.screenshot(section, gray=True)
+    remaining_time_img = util.screenshot(section)
+
+
+    black=0
+    bg_color = remaining_time_img[10,10]
+    #delete : between hour:min:sec, leaving only numbers
+    remaining_time_img=np.delete(remaining_time_img,slice(61,66),axis=1)
+    remaining_time_img=np.delete(remaining_time_img,slice(35,40),axis=1)
+    # util.showImg(remaining_time_img)
+    # exit()
+    # remaining_time_img= np.insert(remaining_time_img,[65]*20+[40]*20, bg_color,axis=1)
+
+    #todo hardcoded
+    font_color = [74,59,40]
+    remaining_time_img = util.thres(remaining_time_img,against=font_color,similarity=0.97)
+
     # util.showImg(remaining_time_img)
     # exit()
 
-    config = TesseractConfig.nomad_cd()
+    config=TesseractConfig.number_optimized()
+
 
     global remaining_time_text
 
+    start = time.time()
     remaining_time_text = util.read(remaining_time_img, config=config)
-
-
+    end = time.time()
     print(remaining_time_text)
+    # exit()
 
 
 
     # TODO 30m and 1h is enough now but we should prepare it to use smaller time skips as well
 
-    #TODO this type of cooldown validation needs to be outsourced
 
 
 
@@ -68,31 +113,28 @@ def get_valid_cd():
     global remaining_time_text
 
 
+    #TODO this type of cooldown validation needs to be outsourced
     def valid_format(text:str):
-        if len(text) != 8: return False
-        if text.count(time_comp_seperator) != 2: return False
-        if not all([len(x) == 2 for x in text.split(time_comp_seperator)]): return False
-        if not all([(x.isdigit() or x == ":") for x in text]): return False
+        if len(text) != 6: return False
+        if not all([(x.isdigit()) for x in text]): return False
 
         return True
 
 
-
-    max_tries=3
+    #todo hardcoded
+    max_tries=5
     remaining_tries=max_tries
 
     while not valid_format(remaining_time_text) and remaining_tries > 0:
         remaining_tries -= 1
         print("The time format is invalid: " + remaining_time_text+". "+str(remaining_tries)+" attempts left")
         time.sleep(1.1) #100% sure that a whole second will pass
-        readTimeOnSkip()
+        readCooldown()
         # TODO handle exception
     else:
         if remaining_tries ==0:
-            print("couldn't read time, going to assume its 50 min")
-            #TODO this needs its own retry mechanicsm, for now we can assume
-            #that if we cant scan the time than its cause the cooldown is at somewhere between 1h and 40 min
-            remaining_time_text="00:55:00"
+            print("couldn't read a proper time, therefore exiting")
+            exit()
         else:
             print("time is valid")
 
@@ -100,7 +142,7 @@ def get_valid_cd():
 
 def calc_minutes():
 
-    time_comps_str: list[str] = remaining_time_text.split(time_comp_seperator)
+    time_comps_str: list[str] = [remaining_time_text[2*i:2*i+2] for i in range(3)]
 
     try:
         time_comps = [int(x) for i, x in enumerate(time_comps_str)]
@@ -201,7 +243,7 @@ def scroll(tick:int) -> None:
 
 def skip_cooldown():
     util.click(OnCooldownPanel.open_timeskips_button_point)
-    readTimeOnSkip()
+    readCooldown()
     get_valid_cd()
     calc_minutes()
     create_timeskip_steps()
@@ -213,12 +255,43 @@ from util import Point
 from common import ActionPalette, AttackConfirmationPanel
 
 
+def isOccupied()->bool:
+    """
+    If the cooldown panel appears after selecting attack then this camp is occupied
+    """
+    #todo hardcoded
+    time_skip_section = (1445, 625, 200, 80)
+    section = util.getSection(time_skip_section)
+
+    possible_timeskip_buttons_img = util.screenshot(section)
+    # util.write_img(possible_timeskip_buttons_img,gui.open_timeskips_menu_buttons)
+    # exit()
+    # util.showImg(possible_timeskip_buttons_img)
+    # util.showImg(util.loadImg(gui.open_timeskips_menu_buttons))
+
+    _similar_,similarity = util.similar(possible_timeskip_buttons_img,
+                                        gui.open_timeskips_menu_buttons,
+                                        similarity_threshold=0.8, returnSimilarity=True)
+    similar = typing.cast(bool,_similar_)
+    print("occupied: ",similar, similarity)
+    # exit()
+
+    return  similar
+
+
+
 def start_attack(camp:Point):
-    offset=Point(15,15,relative=True)
+    offset=Point(15,10,relative=True)
     middle = camp+offset
 
     util.click(middle)
-    util.click(ActionPalette.attack_button_offset)
+    util.click(ActionPalette.attack_button_offset,waitAfterClick=1)
+
+    if isOccupied():
+        skip_cooldown()
+
+    util.click(AttackConfirmationPanel.confirm_button_point)
+    time.sleep(1)
 
 
 
@@ -228,56 +301,20 @@ from actions import attack_with_preset
 
 
 def main():
-    global camps
-
-    from typing import NamedTuple
-
-    class Camp(NamedTuple):
-        location: Point
-        isFree: bool
-
-
-    findCamps(gui.occupied_nomad_camp)
-    occupied_camps:list[Camp]=[Camp(camp,False) for camp in camps]
-    # util.showMatches(camps,gui.occupied_nomad_camp)
-    # print(len(occupied_camps))
+    # isOccupied()
     # exit()
+    findCamps()
+    print("#",len(camps))
+    def attack(camp, preset=None):
+        start_attack(camp)
 
-    findCamps(gui.free_nomad_camp)
-    free_camps:list[Camp]=[Camp(camp,True) for camp in camps]
-    # util.showMatches(camps,gui.free_nomad_camp)
-    # print(len(free_camps))
-    # exit()
+        attack_with_preset(preset, fill_in_waves=True,first_wave_only=True)
 
-    allCamp:list[Camp] = occupied_camps+free_camps
+    attack(camps[0], Presets.nomad)
+    for camp in camps[1:]:
+        attack(camp)
 
-    #TODO sometimes it happens that one camp gets found as free and occupied as well
-    #different level of thresholds could be used but it may would be safer to just filter the duplicates
-    print("#camps",len(allCamp))
-    for camp in allCamp:
-        print(camp.location)
-    # exit()
-    time.sleep(1)
-
-    def run_flow(camp:Camp,preset:int=None):
-        start_attack(camp.location)
-        if not camp.isFree:
-            skip_cooldown()
-        util.click(AttackConfirmationPanel.confirm_button_point)
-        time.sleep(1)
-
-        attack_with_preset(preset,fill_in_waves=True)
-
-
-    run_flow(allCamp[0],Presets.nomad)
-
-    for i in range(1, len(allCamp)):
-        camp = allCamp[i]
-        run_flow(camp)
-
-    exit()
-
-
-import eventloop
-eventloop.wrap(main)
-exit()
+if __name__ == "__main__":
+    global remaining_time_text
+    import eventloop
+    eventloop.wrap(main).wait()

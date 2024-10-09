@@ -108,7 +108,7 @@ class AttackPanel:
         else:
             if not valid:
                 # TODO log
-                print("Could not read commander number, therefore terminating the flow")
+                print("Could not read a commander number, therefore terminating the flow")
                 exit()
 
         return number
@@ -119,8 +119,7 @@ class AttackPanel:
 
     @staticmethod
     def next_available_commander(whitelist:list[int]=None, blacklist:list[int]=None)->Point | None:
-        if blacklist is not None and whitelist is not None:
-            raise ValueError("black and white lists cannot be used together")
+        assert not (blacklist is not None and whitelist is not None), "black and white lists cannot be used together"
 
         if whitelist is not None:
             avaible:Callable[[int],bool]= lambda x: x in whitelist
@@ -162,6 +161,7 @@ class AttackPanel:
 class Presets:
     nomad=4
     dragon_cultist=3
+    npc=3
 
 
 AttackPanel(
@@ -219,6 +219,38 @@ OnCooldownPanel(
 )
 
 
+
+
+
+
+
+class WorldMapView:
+    x_coordinate_input_field_point:Point
+    y_coordinate_input_field_point:Point
+    jump_to_coordinates_button_point:Point
+
+    def __new__(cls, x_coordinate_input_field_point, y_coordinate_input_field_point, jump_to_coordinates_button_point):
+        cls.x_coordinate_input_field_point = x_coordinate_input_field_point
+        cls.y_coordinate_input_field_point = y_coordinate_input_field_point
+        cls.jump_to_coordinates_button_point = jump_to_coordinates_button_point
+
+
+
+    @staticmethod
+    def goto(coordinates:Point | tuple[int,int]):
+        util.double_click(WorldMapView.x_coordinate_input_field_point)
+        util.typeIn(["backspace",*str(coordinates[0])])
+        util.double_click(WorldMapView.y_coordinate_input_field_point)
+        util.typeIn(["backspace",*str(coordinates[1])])
+        util.click(WorldMapView.jump_to_coordinates_button_point)
+
+
+
+WorldMapView(
+    x_coordinate_input_field_point=Point(1140, 77),
+    y_coordinate_input_field_point=Point(1200, 77),
+    jump_to_coordinates_button_point=Point(1270, 87)
+)
 
 
 

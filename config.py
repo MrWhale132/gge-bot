@@ -6,7 +6,7 @@ class TesseractConfig:
     def __init__(self, whitelist:Optional[list[str]] = None, **kwargs:dict[str,Any]) -> None:
         self.whitelist = whitelist
         self._oem:int = 3
-        self._psm: int = 13
+        self.psm_: int = 7
         self.__dict__.update(**kwargs)
 
     @staticmethod
@@ -26,7 +26,7 @@ class TesseractConfig:
     @staticmethod
     def nomad_cd()->TesseractConfig:
         config = TesseractConfig.number_optimized().With(":")
-        config._psm=7
+        config.psm_=7
         return config
 
 
@@ -38,7 +38,7 @@ class TesseractConfig:
 
 
     def build(self)->str:
-        config =f'--oem {self._oem} --psm {self._psm}'
+        config =f'--oem {self._oem} --psm {self.psm_}'
         if len(self.whitelist) != 0:
             config += f' -c tessedit_char_whitelist={"".join(self.whitelist)}'
 
