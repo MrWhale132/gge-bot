@@ -15,3 +15,5 @@ from .storm import _bind
 from .display_names import _bind
 import resources.nomad._bind
 import resources.firepeak._bind
+import resources.popups._bind
+

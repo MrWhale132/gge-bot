@@ -2,7 +2,7 @@ import cv2
 import pyautogui
 
 from util import *
-from resources import ids as gui
+from resources import symbol as gui
 
 
 
@@ -58,7 +58,7 @@ except ValueError:
 
 
 
-import resources.ids as gui
+import resources.symbol as gui
 
 
 exit()

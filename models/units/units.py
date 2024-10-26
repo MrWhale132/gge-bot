@@ -1,5 +1,5 @@
 import util
-from resources import ids as gui
+from resources import symbol as gui
 from models.units.unit import Unit, UnitMeta
 
 UnitMeta.display_names.pop(None) #remove Unit's display_name

@@ -1,14 +1,14 @@
+from __future__ import annotations
 import builtins
 import typing
-from typing import Any, overload, Sequence
+from typing import Any, overload, Sequence, TYPE_CHECKING
 
 import pytesseract, cv2, mss, pyautogui
 import numpy as np
 from cv2.typing import MatLike
 
-from config import Config
+from resources.category import String_rs, Image_rs, Resource
 
-from resources.ids import String_rs, image_rs, Resource
 
 CoordPairList = list[tuple[int, int]]
 CoordLists = tuple[list[int], list[int]]
@@ -16,16 +16,28 @@ CoordLists = tuple[list[int], list[int]]
 from typing import TypeGuard
 from typing import Union
 
-from justtyping.justtypes import PointLike
+
+import justtyping.justtypes as jt
+from justtyping.justtypes import ScreenSection
+
 
 
 
 
 #IMPORTANT
-#todo we use a 0.95 threshold to account for flux's blue light filtering
-def similar(imageA:np.array, imageB:Resource, similarity_threshold:float = 0.95, returnSimilarity:bool = False) ->float | tuple[bool,float]:
-    imageB=loadImg(imageB)
-    assert imageA.shape == imageB.shape, "the shape of the images must match"
+#todo we use a 0.8 threshold to account for flux's blue light filtering
+def similar(imageA:np.ndarray | Resource, imageB:np.ndarray | Resource | ScreenSection, similarity_threshold:float = 0.95, returnSimilarity:bool = False)\
+        -> bool | tuple[bool,float]:
+
+    if isinstance(imageB,ScreenSection):
+        imageB = screenshot(imageB)
+
+    elif isinstance(imageB,Image_rs):
+        imageB=loadImg(imageB)
+
+    imageA = loadIfResource(imageA)
+
+    assert imageA.shape == imageB.shape, f"the shape of the images must match, shape A: {imageA.shape}, shape B: {imageB.shape}"
 
     result = cv2.matchTemplate(imageA, imageB, cv2.TM_CCOEFF_NORMED)
     # print(result)
@@ -329,7 +341,7 @@ def showImg(img):
 from models.objects.Point import Point
 
 
-def showMatches(matches:list[Point], of: Resource | MatLike, in_: MatLike = None):
+def showMatches(matches:list[Point], of: Resource | MatLike = None, in_: MatLike = None):
     if in_ is None:
         in_ = screenshot()
 
@@ -370,9 +382,13 @@ def load(text: String_rs) -> str:
     return open(absPath(text), mode="r", encoding="utf-8").read()
 
 
+
+
+
 @dispatch
-def load(image: image_rs) -> MatLike:
+def load(image: Image_rs) -> MatLike:
     return cv2.imread(absPath(image), cv2.IMREAD_COLOR)
+
 
 
 
@@ -381,17 +397,23 @@ from assertpy import assert_that
 def loadImg(image:Resource)-> np.ndarray:
     assert_that(image._name).ends_with(".png")
 
-    absPath = f"{root.project_path}/{Config.resources_rel_path}/{image.path}/{image._name}"
+    from config import Config
+
+    absPath = f"{root.project_path}/{Config.resources_rel_path}/{image.namespace}/{image._name}"
     return cv2.imread(absPath, cv2.IMREAD_COLOR)
 
 
 
 def absPath(resource_: Resource):
-    return (f"{root.project_path}/{Config.resources_rel_path}/{resource_.path}/{resource_._name}")
+    from config import Config
+
+    return (f"{root.project_path}/{Config.resources_rel_path}/{resource_.namespace}/{resource_._name}")
 
 
 def absLoad(resource_: Resource):
-    absPath = f"{root.project_path}/{Config.resources_rel_path}/{resource_.path}/{resource_._name}"
+    from config import Config
+
+    absPath = f"{root.project_path}/{Config.resources_rel_path}/{resource_.namespace}/{resource_._name}"
     return cv2.imread(absPath, cv2.IMREAD_COLOR)
 
 
@@ -416,19 +438,22 @@ def screenshot(section=None, to_cv2=True, gray=False)->np.ndarray | ScreenShot:
 
 
 
+
 import mss.tools
 #todo currently we can not say param:ImageResource
 def write_img(image:ScreenShot, into:Resource):
+    assert type(image) is ScreenShot, "image must be a ScreenShot, you probably forgot to NOT to turn the sceenshot into cv2 format"
+
     path = absPath(into)
     mss.tools.to_png(image.rgb, image.size, output=path)
 
 
 
-#TODO move it to top
 from config import TesseractConfig
 
 
 def read(image: MatLike, numbers=False, config:TesseractConfig = TesseractConfig.default()) -> str:
+
     #TODO assert use numbers or config, but not both
     if numbers:
         _config:str = TesseractConfig.number_optimized().build()
@@ -530,10 +555,20 @@ def getSection(section)->dict:
     return {
         "top": section[1],
         "left": section[0],
-        "width": section[2],
-        "height": section[3]
+        "width": section[3],
+        "height": section[2]
     }
 
+
+
+
+def getsection(topleft:PointLike, bottomrigth:PointLike):
+    return {
+        "top": topleft[1],
+        "left": topleft[0],
+        "width": bottomrigth[0] - topleft[0],
+        "height": bottomrigth[1] - topleft[1]
+    }
 
 
 from justtyping.justtypes import PointLike
@@ -564,7 +599,7 @@ def find(image: Resource | MatLike,
 
     # Find where the matches occur
     locations: CoordLists = np.where(result >= threshold)
-    print(result[locations])
+    # print(result[locations])
 
     locations:list[PointLike] = np.transpose(locations[::-1]) #mypy ignore
 
@@ -605,13 +640,19 @@ def click(point:Point,waiteBeforeClick:float =0.1, waitAfterClick:float = 0.1,mo
 
 from typing import Optional
 
+if TYPE_CHECKING:
+    from uielements.gameobject import GameObject
+
+
 def click(
-        point:Optional[Point | tuple[int,int] | list[int, int]] = None,
+        point:Optional[Point | tuple[int,int] | list[int, int] | GameObject] = None,
         waiteBeforeClick:float =0.2,
         waitAfterClick:float = 0.1,
         moveDuration:float = 0.5)\
         ->None:
+    from uielements.gameobject import GameObject
 
+    isinstance(point,GameObject)
     if point is not None:
         if not isinstance(point, Point):
             if isinstance(point,list | tuple):
@@ -620,7 +661,7 @@ def click(
                 raise TypeError("point must be Point or tuple/list of int")
         else:
             _point = point
-        _move_to_than_click(_point, waiteBeforeClick, waitAfterClick,duration=moveDuration)
+        _move_to_then_click(_point, waiteBeforeClick, waitAfterClick, duration=moveDuration)
     else:
         _just_click(waiteBeforeClick, waitAfterClick)
 
@@ -635,7 +676,7 @@ def _just_click(waiteBeforeClick:float =0.1, waitAfterClick:float = 0.1)->None:
         pyautogui.sleep(waitAfterClick)
 
 
-def _move_to_than_click(point: Point, waiteBeforeClick:float =0.1, waitAfterClick:float = 0.1,duration:float = 0.5)->None:
+def _move_to_then_click(point: Point, waiteBeforeClick:float =0.1, waitAfterClick:float = 0.1, duration:float = 0.5)->None:
     move_mouse_to(point,duration=duration)
     _just_click(waiteBeforeClick, waitAfterClick)
 
@@ -651,4 +692,7 @@ def double_click(point:Point | tuple[int,int])->None:...
 def double_click(point:Point | tuple[int,int])->None:
     click(point,waitAfterClick=0)
     click(waiteBeforeClick=0.1,waitAfterClick=0)
+
+
+
 

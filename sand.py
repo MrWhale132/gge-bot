@@ -30,7 +30,7 @@ def main():
 
 
     def attack(tower:Point, preset=None):
-        attack_with_preset(target=tower,preset=preset,use_horses=True,commander_blacklist=blacklist)
+        attack_with_preset(target=tower,preset=preset,use_horses=True,commander_blacklist=blacklist,first_wave_only=False)
 
     #
     #
@@ -44,9 +44,8 @@ def main():
     for i in range(1,10):
         attack(towers[i])
 
-
-    #todo beacuse game lag, we cannot rely on that dragging will positioning the screen properly
-    pyautogui.dragRel(0,800,duration=2.5)
+    util.move_mouse_to((1094, 714))
+    pyautogui.dragRel(0,400,duration=1)
 
 
     towers=[

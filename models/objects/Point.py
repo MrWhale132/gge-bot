@@ -20,9 +20,12 @@ class Point:
 
     @staticmethod
     def From(
-            x:int | PointLike | Sequence[PointLike],
+            x:int | Point | PointLike | Sequence[PointLike],
             y:int=None)\
             ->Point | Sequence[Point]:
+
+        if isinstance(x, Point):
+            return x
 
         if isinstance(x,int):
             assert y is not None,"can not use x without y"

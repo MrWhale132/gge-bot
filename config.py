@@ -1,6 +1,14 @@
 from __future__ import annotations
 from typing import Optional, Any, List
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from justtyping.justtypes import ScreenSection
+    from resources.symbol import Image_rs
+
+
+
+
 
 class TesseractConfig:
     def __init__(self, whitelist:Optional[list[str]] = None, **kwargs:dict[str,Any]) -> None:
@@ -67,6 +75,39 @@ class CommanderConfig:
 
     npc_event_commanders=[*range(1,6)]
 
-    barbarian_tower_blacklist_commanders=storm_commanders+npc_event_commanders
+    barbarian_tower_blacklist_commanders=storm_commanders
+
+
+
+
+
+
+class SimpleImageValidatorConfig:
+    def __init__(self, section:ScreenSection, image:Image_rs):
+        self.section = section
+        self.image = image
+
+
+
+class SimpleImageValidatorConfigSource:
+    util=None
+    gui=None
+
+    def __new__(cls, *args, **kwargs):
+        import util
+        cls.util = util
+        from resources import symbol as gui
+        cls.gui = gui
+
+
+    @classmethod
+    def samurai_reward(cls)-> SimpleImageValidatorConfig:
+        return SimpleImageValidatorConfig(cls.util.getSection((1130,710, 30,60)),cls.gui.samurai_individual_reward_popup)
+
+    @classmethod
+    def ruby_offer_1(cls) -> SimpleImageValidatorConfig:
+        return SimpleImageValidatorConfig(cls.util.getSection((1080,935,60,60)),cls.gui.ruby_offer_popup_1)
+
+    # ruby_offer_2=SimpleImageValidatorConfig(util.getSection((1065,630,100,80)),gui.ruby_offer_popup_2)
 
 

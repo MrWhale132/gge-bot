@@ -1,16 +1,43 @@
 import time
 import typing
 
-import cv2
 import numpy as np
 import pyautogui
-from config import TesseractConfig
 
 import util
-from models.objects.Point import Point
-from resources import ids as gui
-from resources.ids import Resource
+from config import TesseractConfig
+from resources import symbol as gui
+from resources.category import Resource
+from justtyping.justtypes import PointLike
+
+from uielements.gameobject import NomadCamp
+
+
 #
+# locations:list[PointLike]
+# locations, screenshot = util.find(gui.dragon_cultist_free_npc_tower_level_3, threshold=0.8, returnScreenshot=True)
+# print("#", len(locations))
+# camps = [NomadCamp(gui.dragon_cultist_free_npc_tower_level_3,position=loc, occupied=False) for loc in locations]
+# util.click(camps[0])
+#
+# exit()
+
+#
+#
+# reward_popup=(1100, 700, 100, 100)
+#
+# section=util.getSection(reward_popup)
+#
+# img= util.screenshot(section, to_cv2=True)
+# img= util.screenshot(section, to_cv2=False)
+# # util.showImg(img)
+# util.write_img(img,gui.nomad_individual_reward_popup)
+# exit()
+#
+
+
+
+
 # #
 # camps:list[Point]
 # camps, screenshot = util.find(gui.occupied_nomad_camp,threshold=0.8,returnScreenshot=True)
@@ -21,20 +48,20 @@ from resources.ids import Resource
 # exit()
 
 def findCamps(campType: Resource = None)->None:
-    global camps
+    global locations
     if campType is not None:
-        camps = util.find(campType,threshold=0.9)
+        locations = util.find(campType, threshold=0.9)
         return
 
     free=util.find(gui.free_nomad_camp,threshold=0.9)
     notfree=util.find(gui.occupied_nomad_camp,threshold=0.8)
-    camps = free + notfree
+    locations = free + notfree
 
     return
 
 
     #todo mock, hardcoded
-    camps= [
+    locations= [
         Point(1148, 437),
         Point(1226, 358),
         Point(1222, 1124),
@@ -304,14 +331,14 @@ def main():
     # isOccupied()
     # exit()
     findCamps()
-    print("#",len(camps))
+    print("#", len(locations))
     def attack(camp, preset=None):
         start_attack(camp)
 
         attack_with_preset(preset, fill_in_waves=True,first_wave_only=True)
 
-    attack(camps[0], Presets.nomad)
-    for camp in camps[1:]:
+    attack(locations[0], Presets.nomad)
+    for camp in locations[1:]:
         attack(camp)
 
 if __name__ == "__main__":

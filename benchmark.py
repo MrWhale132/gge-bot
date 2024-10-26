@@ -39,7 +39,7 @@ min_dist = 40  # Set the minimum distance threshold
 # print(filtered)
 
 import util
-from resources import ids as gui
+from resources import symbol as gui
 
 
 data=util.find(gui.occupied_nomad_camp,threshold=0.1, unique_=False,asPoints=False)

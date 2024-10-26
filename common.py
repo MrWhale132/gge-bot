@@ -1,18 +1,18 @@
 from models.objects.Point import Point
+from justtyping.justtypes import PointLike
 import util
 from typing import Callable
 
 
 class ActionPalette:
-    attack_button_offset: Point
-
-    def __new__(cls, attack_button_offset):
-        cls.attack_button_offset = attack_button_offset
+    attack_button_offset= Point(130, 40,relative=True)
 
 
-ActionPalette(
-    attack_button_offset=Point(130, 40,relative=True)
-)
+    def __init__(self,centered_on:PointLike = None):
+        self.centered_on = centered_on
+
+
+
 
 
 class AttackConfirmationPanel:

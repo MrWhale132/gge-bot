@@ -1,4 +1,4 @@
 
-from resources import ids, getRelPath
+from resources import category, getRelPath
 
-ids.strom_rs.path = getRelPath(__file__)
+category.strom_rs.namespace = getRelPath(__file__)

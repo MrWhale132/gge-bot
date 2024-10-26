@@ -1,4 +1,4 @@
-import resources.ids as gui
+import resources.symbol as gui
 import util
 from util import CoordPairList
 from config import Config
@@ -104,12 +104,12 @@ for i in range(len(filtered)-1):
     
     
     # show units
-    matches= find(gui.unit_slot)
+    locations= find(gui.unit_slot)
     # print(len(matches))
     #TODO hardcoded
     unit_slot_button=(
-        matches[0][0]+20,
-        matches[0][1]+20
+        locations[0][0] + 20,
+        locations[0][1] + 20
     )
     
     move_mouse_curve(confirm_button, unit_slot_button, lambda x: x**3, duration=1, steps=10)
